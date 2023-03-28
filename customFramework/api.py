@@ -4,6 +4,7 @@ from typing import Optional
 from parse import parse
 from webob import Request, Response
 
+from customFramework import exceptions
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,9 @@ class API:
 
     def route(self, path):
         """Register route"""
+        if path in self._routes:
+            raise exceptions.DuplicateRoute("Such route already exists.")
+
         def wrapper(route_handler: callable, *args, **kwargs):
             self._routes[path] = route_handler
             return route_handler
