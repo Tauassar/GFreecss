@@ -1,11 +1,13 @@
 import inspect
 import logging
+import os
 from typing import Optional
 
 from requests import Session as RequestsSession
 from wsgiadapter import WSGIAdapter as RequestsWSGIAdapter
 from parse import parse
 from webob import Request, Response
+from jinja2 import Environment, FileSystemLoader
 
 from customFramework import exceptions
 
@@ -14,9 +16,19 @@ logger = logging.getLogger(__name__)
 
 class API:
     _routes = {}
+    templates_env: Environment = None
 
-    def __init__(self):
+    def __init__(self, templates_dir='templates'):
         self._routes = {}
+        self.templates_env = Environment(
+            loader=FileSystemLoader(os.path.abspath(templates_dir))
+        )
+
+    def template(self, template_name, context=None):
+        if context is None:
+            context = {}
+
+        return self.templates_env.get_template(template_name).render(**context)
 
     def __call__(self, environ, start_response) -> Response:
         request = Request(environ=environ)
