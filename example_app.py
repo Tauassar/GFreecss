@@ -41,6 +41,19 @@ def sum(request, num_1, num_2, *args, **kwargs):
     return response
 
 
+@app.route("/template")
+def sum(request, *args, **kwargs):
+    response = Response()
+    response.body = app.template(
+        'index.html',
+        context={
+            "name": "First template answer",
+            "text": "Hello world"
+        },
+    ).encode()
+    return response
+
+
 @app.route("/book")
 class BooksResource:
     def get(self, request, *args, **kwargs):
