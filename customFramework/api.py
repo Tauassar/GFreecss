@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 class API:
     _routes = {}
 
+    def __init__(self):
+        self._routes = {}
+
     def __call__(self, environ, start_response) -> Response:
         request = Request(environ=environ)
 
