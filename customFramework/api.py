@@ -45,6 +45,13 @@ class API:
         response.status = 404
         return response
 
+    @staticmethod
+    def get_405_response() -> Response:
+        response = Response()
+        response.text = 'METHOD NOT ALLOWED'
+        response.status = 405
+        return response
+
     def handle_request(self, request) -> Response:
         response: Response
         handler, kwargs = self._get_route_handler(request.path)
@@ -55,7 +62,7 @@ class API:
                     concrete_handler = getattr(handler(), request.method.lower())
                     response = concrete_handler(request, **kwargs)
                 else:
-                    raise exceptions.MethodNotAllowed("Method not allowed", request.method)
+                    response = self.get_405_response()
             else:
                 response = handler(request, **kwargs)
         else:
