@@ -45,7 +45,7 @@ class API:
                     concrete_handler = getattr(handler(), request.method.lower())
                     response = concrete_handler(request, **kwargs)
                 else:
-                    response = self.get_404_response()
+                    raise exceptions.MethodNotAllowed("Method not allowed", request.method)
             else:
                 response = handler(request, **kwargs)
         else:
