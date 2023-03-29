@@ -4,6 +4,7 @@ import os
 from typing import Optional
 
 from requests import Session as RequestsSession
+from whitenoise import WhiteNoise
 from wsgiadapter import WSGIAdapter as RequestsWSGIAdapter
 from parse import parse
 from webob import Request, Response
@@ -19,14 +20,16 @@ class API:
     _routes = {}
     templates_env: Environment = None
     exception_handler: callable = DefaultExceptionHandler.handle_exception
+    whitenoise: WhiteNoise
 
-    def __init__(self, templates_dir='templates'):
+    def __init__(self, templates_dir='templates', static_dir='static'):
         self._routes = {}
         self.templates_env = Environment(
             loader=FileSystemLoader(os.path.abspath(templates_dir))
         )
+        self.whitenoise = WhiteNoise(self.wsgi_application, root=static_dir)
 
-    def __call__(self, environ, start_response) -> Response:
+    def wsgi_application(self, environ, start_response):
         request = Request(environ=environ)
         try:
             response = self.handle_request(request)
@@ -37,6 +40,9 @@ class API:
             response = self.exception_handler(request=request, exception=e)
 
         return response(environ, start_response)
+
+    def __call__(self, environ, start_response) -> Response:
+        return self.whitenoise(environ, start_response)
 
     def set_exception_handler(self, exception_handler):
         self.exception_handler = exception_handler
