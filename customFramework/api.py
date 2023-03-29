@@ -10,8 +10,9 @@ from parse import parse
 from webob import Request, Response
 from jinja2 import Environment, FileSystemLoader
 
-from customFramework import exceptions
-from customFramework.exception_handlers import DefaultExceptionHandler
+from . import exceptions
+from .exception_handlers import DefaultExceptionHandler
+from .middleware import Middleware
 
 logger = logging.getLogger(__name__)
 
@@ -27,18 +28,15 @@ class API:
         self.templates_env = Environment(
             loader=FileSystemLoader(os.path.abspath(templates_dir))
         )
-        self.whitenoise = WhiteNoise(self.wsgi_application, root=static_dir)
+        self.middleware = Middleware(self)
+        self.whitenoise = WhiteNoise(self.middleware, root=static_dir)
+
+    def add_middleware(self, middleware_cls):
+        self.middleware.add(middleware_cls)
 
     def wsgi_application(self, environ, start_response):
         request = Request(environ=environ)
-        try:
-            response = self.handle_request(request)
-
-        except Exception as e:
-            if self.exception_handler is None:
-                raise e
-            response = self.exception_handler(request=request, exception=e)
-
+        response = self.handle_request(request)
         return response(environ, start_response)
 
     def __call__(self, environ, start_response) -> Response:
@@ -67,25 +65,31 @@ class API:
         return None, None
 
     def handle_request(self, request) -> Response:
-        response: Response
-        handler, kwargs = self._get_route_handler(request.path)
+        try:
+            response: Response
+            handler, kwargs = self._get_route_handler(request.path)
 
-        if handler:
-            if inspect.isclass(handler):
-                if hasattr(handler, request.method.lower()):
-                    concrete_handler = getattr(handler(), request.method.lower())
-                    response = concrete_handler(request, **kwargs)
+            if handler:
+                if inspect.isclass(handler):
+                    if hasattr(handler, request.method.lower()):
+                        concrete_handler = getattr(handler(), request.method.lower())
+                        response = concrete_handler(request, **kwargs)
+                    else:
+                        raise exceptions.MethodNotAllowed(
+                            f'Method {request.method} not allowed for {request.path}',
+                        )
                 else:
-                    raise exceptions.MethodNotAllowed(
-                        f'Method {request.method} not allowed for {request.path}',
-                    )
+                    response = handler(request, **kwargs)
             else:
-                response = handler(request, **kwargs)
-        else:
-            raise exceptions.RouteNotFound(f'No valid view for route {request.path} found')
+                raise exceptions.RouteNotFound(f'No valid view for route {request.path} found')
 
-        logger.info(f'{request.method} {response.status} response for {request.path} route')
-        return response
+            logger.info(f'{request.method} {response.status} response for {request.path} route')
+            return response
+
+        except Exception as e:
+            if self.exception_handler is None:
+                raise e
+            return self.exception_handler(request=request, exception=e)
 
     def route(self, path):
         """Register route"""
