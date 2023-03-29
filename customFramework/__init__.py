@@ -39,3 +39,16 @@ def sum(request, num_1, num_2, *args, **kwargs):
     response = Response()
     response.text = f"{num_1} + {num_2} = {total}"
     return response
+
+
+@app.route("/book")
+class BooksResource:
+    def get(self, request, *args, **kwargs):
+        response = Response()
+        response.text = "Books Page"
+        return response
+
+    def post(self, request, *args, **kwargs):
+        response = Response()
+        response.text = "Endpoint to create a book"
+        return response

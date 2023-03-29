@@ -1,3 +1,4 @@
+import inspect
 import logging
 from typing import Optional
 
@@ -35,10 +36,18 @@ class API:
         return response
 
     def handle_request(self, request) -> Response:
-
+        response: Response
         handler, kwargs = self._get_route_handler(request.path)
+
         if handler:
-            response: Response = handler(request, **kwargs)
+            if inspect.isclass(handler):
+                if hasattr(handler, request.method.lower()):
+                    concrete_handler = getattr(handler(), request.method.lower())
+                    response = concrete_handler(request, **kwargs)
+                else:
+                    response = self.get_404_response()
+            else:
+                response = handler(request, **kwargs)
         else:
             response = self.get_404_response()
 
