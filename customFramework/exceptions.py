@@ -1,5 +1,5 @@
 
-class DuplicateRoute(Exception):
+class DuplicateRoute(AssertionError):
     ...
 
 
