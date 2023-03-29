@@ -10,6 +10,7 @@ from webob import Request, Response
 from jinja2 import Environment, FileSystemLoader
 
 from customFramework import exceptions
+from customFramework.exception_handlers import DefaultExceptionHandler
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 class API:
     _routes = {}
     templates_env: Environment = None
+    exception_handler: callable = DefaultExceptionHandler.handle_exception
 
     def __init__(self, templates_dir='templates'):
         self._routes = {}
@@ -24,18 +26,26 @@ class API:
             loader=FileSystemLoader(os.path.abspath(templates_dir))
         )
 
+    def __call__(self, environ, start_response) -> Response:
+        request = Request(environ=environ)
+        try:
+            response = self.handle_request(request)
+
+        except Exception as e:
+            if self.exception_handler is None:
+                raise e
+            response = self.exception_handler(request=request, exception=e)
+
+        return response(environ, start_response)
+
+    def set_exception_handler(self, exception_handler):
+        self.exception_handler = exception_handler
+
     def template(self, template_name, context=None):
         if context is None:
             context = {}
 
         return self.templates_env.get_template(template_name).render(**context)
-
-    def __call__(self, environ, start_response) -> Response:
-        request = Request(environ=environ)
-
-        response = self.handle_request(request)
-
-        return response(environ, start_response)
 
     def test_session(self, base_url="http://testserver"):
         session = RequestsSession()
@@ -50,20 +60,6 @@ class API:
 
         return None, None
 
-    @staticmethod
-    def get_404_response() -> Response:
-        response = Response()
-        response.text = 'NOT FOUND'
-        response.status = 404
-        return response
-
-    @staticmethod
-    def get_405_response() -> Response:
-        response = Response()
-        response.text = 'METHOD NOT ALLOWED'
-        response.status = 405
-        return response
-
     def handle_request(self, request) -> Response:
         response: Response
         handler, kwargs = self._get_route_handler(request.path)
@@ -74,11 +70,13 @@ class API:
                     concrete_handler = getattr(handler(), request.method.lower())
                     response = concrete_handler(request, **kwargs)
                 else:
-                    response = self.get_405_response()
+                    raise exceptions.MethodNotAllowed(
+                        f'Method {request.method} not allowed for {request.path}',
+                    )
             else:
                 response = handler(request, **kwargs)
         else:
-            response = self.get_404_response()
+            raise exceptions.RouteNotFound(f'No valid view for route {request.path} found')
 
         logger.info(f'{request.method} {response.status} response for {request.path} route')
         return response
