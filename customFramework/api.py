@@ -2,6 +2,8 @@ import inspect
 import logging
 from typing import Optional
 
+from requests import Session as RequestsSession
+from wsgiadapter import WSGIAdapter as RequestsWSGIAdapter
 from parse import parse
 from webob import Request, Response
 
@@ -23,6 +25,11 @@ class API:
 
         return response(environ, start_response)
 
+    def test_session(self, base_url="http://testserver"):
+        session = RequestsSession()
+        session.mount(prefix=base_url, adapter=RequestsWSGIAdapter(self))
+        return session
+
     def _get_route_handler(self, route) -> tuple[Optional[callable], Optional[str]]:
         for path, handler in self._routes.items():
             parse_result = parse(path, route)
@@ -34,7 +41,7 @@ class API:
     @staticmethod
     def get_404_response() -> Response:
         response = Response()
-        response.text = 'Route not found'
+        response.text = 'NOT FOUND'
         response.status = 404
         return response
 
